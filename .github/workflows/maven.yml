@@ -25,10 +25,6 @@ jobs:
   build-server:
     name: Build PNX server
     runs-on: ubuntu-latest
-    #    event为push且发生改变或push或commit第一条信息+b +u
-    #    event is push and there is a change or push or commit the first message +b +u
-    if: (github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository) && (contains(needs.check-files.outputs.changed-files, 'src/') || (github.event_name == 'push' && (contains(github.event.commits[0].message, '+b') || contains(github.event.commits[0].message, '+u'))))
-
     steps:
       - uses: actions/checkout@v1
         with:
@@ -68,25 +64,21 @@ jobs:
           md5sum libs.tar.gz > hash/md5/libs.tar.gz.md5
       - name: Archive PNX Core
         uses: actions/upload-artifact@v3
-        if: success()
         with:
           name: PowerNukkitX-Core
           path: target/powernukkitx.jar
       - name: Archive PNX Full
         uses: actions/upload-artifact@v3
-        if: success()
         with:
           name: PowerNukkitX-Full
           path: target/powernukkitx-full.jar
       - name: Archive Libraries
         uses: actions/upload-artifact@v3
-        if: success()
         with:
           name: PowerNukkitX-Libs
           path: target/libs/
       - name: Archive Hashes
         uses: actions/upload-artifact@v3
-        if: success()
         with:
           name: Hashes(md5 & sha256)
           path: target/hash/
@@ -95,7 +87,6 @@ jobs:
         run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
       - uses: ncipollo/release-action@v1
         name: Release new version
-        if: success() && contains(github.event.commits[0].message, '+u') && github.repository == 'PowerNukkitX/PowerNukkitX' && contains(github.ref_name, 'master')
         with:
           artifacts: "target/powernukkitx.jar,target/libs.tar.gz,target/hash/sha256/powernukkitx.jar.sha256,target/hash/sha256/libs.tar.gz.sha256,target/hash/md5/powernukkitx.jar.md5,target/hash/md5/libs.tar.gz.md5"
           tag: ${{ steps.getVersion.outputs.version }}
@@ -105,7 +96,6 @@ jobs:
           allowUpdates: true
       - name: Upload to OSS
         uses: tvrcgo/upload-to-oss@v0.1.1
-        if: github.event_name == 'push' && github.repository == 'PowerNukkitX/PowerNukkitX' && (!contains(github.ref_name, 'patch')) && (!contains(github.ref_name, 'feature'))
         with:
           key-id: ${{ secrets.OSS_KEY_ID }}
           key-secret: ${{ secrets.OSS_KEY_SECRET }}
@@ -116,25 +106,11 @@ jobs:
       - name: Get Time
         id: time
         uses: nanzm/get-time-action@v1.1
-        if: github.repository == 'PowerNukkitX/PowerNukkitX' && (!contains(github.ref_name, 'patch')) && (!contains(github.ref_name, 'feature'))
         with:
           timeZone: 8
           format: 'YYYY/MM/DD-HH:mm:ss'
       - name: Format ChangeLog
         uses: mkungla/actions-set-text-output@v1
         id: get-changelog
-        if: success() && github.event_name == 'push' && github.repository == 'PowerNukkitX/PowerNukkitX' && (!contains(github.ref_name, 'patch')) && (!contains(github.ref_name, 'feature'))
         with:
           text: ${{ github.event.commits[0].message }}
-      - name: Update MineBBS infomation
-        uses: fjogeleit/http-request-action@v1
-        if: success() && github.event_name == 'push' && github.repository == 'PowerNukkitX/PowerNukkitX' && (!contains(github.ref_name, 'patch')) && (!contains(github.ref_name, 'feature'))
-        with:
-          url: 'https://api.minebbs.com/api/openapi/v1/resources/3668/update'
-          method: 'POST'
-          customHeaders: '{"Authorization": "Bearer ${{ secrets.MINEBBS_API_KEY }}"}'
-          contentType: 'application/json'
-          data: '{"title": "${{ github.ref_name }}-${{ steps.vars.outputs.sha_short }}", "description": "${{ steps.get-changelog.outputs.value }}", "new_version": "${{ steps.time.outputs.time }}", "file_url": "https://ci.lt-name.cn/job/PowerNukkitX/"}'
-          escapeData: 'true'
-          preventFailureOnNoResponse: 'true'
-          ignoreStatusCodes: '400,404,401,403,500,502,503,504'
